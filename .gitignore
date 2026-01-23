@@ -12,6 +12,7 @@ env/
 
 # Data (optional)
 *.csv
+pages/IPl.csv
 
 # OS
 .DS_Store
