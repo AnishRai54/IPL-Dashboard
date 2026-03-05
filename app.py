@@ -1,83 +1,275 @@
-
-import streamlit as st
-import plotly.express as px
-from platformdirs import user_config_path
 import pandas as pd
+import plotly.express as px
+import streamlit as st
+from pathlib import Path
 
 from dbhelper import DB
 
-db=DB()
+db = DB()
 
-import streamlit as st
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="IPL Dashboard", layout="wide")
 
-st.set_page_config(
-    page_title="IPL Dashboard",
-    layout="wide"
-)
-
-# st.image("https://www.shutterstock.com/image-photo/semi-top-view-rounded-full-600nw-2594552419.jpg",use_container_width=True)
-
-# here only side bar working
-
-st.markdown( """ 
-
+st.markdown(
+    """
 <style>
-[data-testid="stSidebar"]{
-background-color:black;
+:root {
+    --bg: black;
+    --bg-2: grey;
+    --card: #ffffff;
+    --ink: #10233c;
+    --muted: #4d607a;
+    --brand: #ef6c00;
+    --brand-2: #00897b;
+    --brand-3: #1565c0;
+}
+.stApp {
+    background:
+        radial-gradient(circle at 10% 8%, rgba(0, 137, 123, 0.12) 0%, rgba(0, 137, 123, 0) 36%),
+        radial-gradient(circle at 88% 0%, rgba(21, 101, 192, 0.2) 0%, rgba(21, 101, 192, 0) 40%),
+        linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 60%);
+}
+[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
+    border-right: 1px solid #243048;
 }
 [data-testid="stSidebar"] * {
-    color: rgb(5, 247, 255);
+    color: #e5f0ff !important;
 }
-
-
+.hero {
+    background: linear-gradient(130deg, var(--brand-2) 0%, var(--brand-3) 58%, var(--brand) 100%);
+    border-radius: 18px;
+    padding: 1.2rem 1.4rem;
+    color: white;
+    margin-bottom: 0.8rem;
+    box-shadow: 0 10px 24px rgba(20, 79, 159, 0.2);
+}
+.hero h1 {
+    font-size: 2rem;
+    margin: 0;
+}
+.hero p {
+    margin: 0.35rem 0 0 0;
+    color: #dbeafe;
+}
+.chip-row {
+    margin-top: 0.65rem;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.chip {
+    display: inline-block;
+    padding: 0.3rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #f8fbff;
+    font-size: 0.82rem;
+}
+.section-card {
+    background: var(--card);
+    border: 1px solid #d7e3f0;
+    border-radius: 16px;
+    padding: 0.9rem 1rem;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+.kpi-card {
+    background: var(--card);
+    border: 1px solid #d7e3f0;
+    border-radius: 14px;
+    padding: 0.85rem 0.95rem;
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+}
+.kpi-label {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.kpi-value {
+    margin-top: 0.3rem;
+    font-size: 1.45rem;
+    color: var(--ink);
+    font-weight: 700;
+    line-height: 1.05;
+}
+.kpi-note {
+    margin-top: 0.2rem;
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+.img-card {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #d7e3f0;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.13);
+}
+.caption-text {
+    color: var(--muted);
+    margin-top: 0.25rem;
+}
 </style>
 """,
-             unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
-
 st.sidebar.title("IPL Dashboard")
+sidebar_logo = "https://www.shutterstock.com/image-photo/semi-top-view-rounded-full-600nw-2594552419.jpg"
+st.sidebar.image(sidebar_logo, use_container_width=True)
+season = db.fetch_Season()
+selected_season = st.sidebar.selectbox("Season", season, index=0)
+team = db.fetch_team()
+selected_team = st.sidebar.selectbox("Team", team, index=0)
+st.sidebar.caption(f"Active season: {selected_season}")
+st.sidebar.caption(f"Selected team: {selected_team}")
 
-st.sidebar.image("data:image/png;base64,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")
+team_names, trophies = db.fetch_NoOfTrophy()
+df = pd.DataFrame({"team": team_names, "no_of_trophy": trophies}).sort_values(
+    "no_of_trophy", ascending=False
+)
+df["rank"] = df["no_of_trophy"].rank(method="dense", ascending=False).astype(int)
 
-# only season task done
-season=db.fetch_Season()
-st.sidebar.selectbox("Season",season)
+total_teams = int(df["team"].nunique())
+total_titles = int(df["no_of_trophy"].sum())
+top_team = df.iloc[0]
+avg_titles = round(float(df["no_of_trophy"].mean()), 2)
 
+st.markdown(
+    f"""
+<div class="hero">
+    <h1>IPL Analytics Dashboard</h1>
+    <p>Professional snapshot of championship outcomes, team dominance, and title distribution trends.</p>
+    <div class="chip-row">
+        <span class="chip">Season Focus: {selected_season}</span>
+        <span class="chip">Team Lens: {selected_team}</span>
+        <span class="chip">Top Franchise: {top_team["team"]}</span>
+    </div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
+local_images = sorted(Path("assets").glob("*"))
+hero_images = [str(path) for path in local_images if path.suffix.lower() in [".png", ".jpg", ".jpeg", ".webp"]][:3]
+if not hero_images:
+    hero_images = [
+  "https://commons.wikimedia.org/wiki/Special:FilePath/Eden%20Gardens%20during%20IPL%20match%2006.jpg",
+  "https://commons.wikimedia.org/wiki/Special:FilePath/Wankhede%20stadium.jpg",
+  "https://commons.wikimedia.org/wiki/Special:FilePath/IPL%20Match%20--%20Dr.%20D%20Y%20Patil%20Stadium.jpg"
+]
 
-# here only sirst page design and text part
+img_col1, img_col2, img_col3 = st.columns(3)
+for col, image in zip([img_col1, img_col2, img_col3], hero_images):
+    with col:
+        st.markdown('<div class="img-card">', unsafe_allow_html=True)
+        st.image(image, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+st.markdown('<p class="caption-text">Add your own images in `assets/` to replace demo visuals automatically.</p>', unsafe_allow_html=True)
 
-st.title("IPL Analytics Dashboard")
+kpi_cols = st.columns(4, gap="medium")
+kpi_data = [
+    ("Total Teams", total_teams, "Franchises in trophy table"),
+    ("Total Titles", total_titles, "Finals won across IPL seasons"),
+    ("Most Successful", int(top_team["no_of_trophy"]), str(top_team["team"])),
+    ("Avg Titles/Team", avg_titles, "Across all listed teams"),
+]
+for col, (label, value, note) in zip(kpi_cols, kpi_data):
+    with col:
+        st.markdown(
+            f"""
+<div class="kpi-card">
+    <div class="kpi-label">{label}</div>
+    <div class="kpi-value">{value}</div>
+    <div class="kpi-note">{note}</div>
+</div>
+""",
+            unsafe_allow_html=True,
+        )
 
-st.header("Overview")
-st.markdown(""" **
-This dashboard provides an analytical view of the Indian Premier League (IPL), focusing on team performance, championship wins, and season-wise trends using historical match data.""")
-st.markdown("""
-- **Team Performance:** Total IPL titles by each team  
-- **Season Analysis:** Trends across IPL seasons  
-- **Final Matches:** Insights from IPL finals  
-""")
+overview_col, spotlight_col = st.columns([1.6, 1], gap="large")
 
-st.title(" IPL Team")
-team=db.fetch_team()
-st.dataframe(team,use_container_width=True)
+with overview_col:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("Executive Overview")
+    st.markdown(
+        """
+This page highlights title-winning patterns from IPL finals and identifies dominant franchises over time.
 
+- Title count benchmarking across teams  
+- Fast identification of the top-performing franchise  
+- Compact leaderboard for decision-ready insights
+"""
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
+with spotlight_col:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("Top 3 Franchises")
+    for _, row in df.head(3).iterrows():
+        st.markdown(f'- **#{int(row["rank"])} {row["team"]}**: {int(row["no_of_trophy"])} titles')
+    st.markdown("</div>", unsafe_allow_html=True)
 
-team,no_of_trophy=db.fetch_NoOfTrophy()
-data = {
-    "team": team,
-    "no_of_trophy": no_of_trophy
-}
-df = pd.DataFrame(data)
+chart_col, leader_col = st.columns([2, 1], gap="large")
 
+with chart_col:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    chart_source = df.sort_values("no_of_trophy").copy()
+    fig = px.bar(
+        chart_source,
+        x="no_of_trophy",
+        y="team",
+        orientation="h",
+        color="no_of_trophy",
+        color_continuous_scale=[
+            [0.0, "#b2ebf2"],
+            [0.35, "#26a69a"],
+            [0.7, "#1565c0"],
+            [1.0, "#ef6c00"],
+        ],
+        text="no_of_trophy",
+        custom_data=["rank"],
+    )
+    fig.update_traces(
+        textposition="outside",
+        cliponaxis=False,
+        marker_line_color="rgba(255,255,255,0.9)",
+        marker_line_width=1.2,
+        hovertemplate="<b>%{y}</b><br>Titles: %{x}<br>Rank: %{customdata[0]}<extra></extra>",
+    )
+    fig.update_layout(
+        title="IPL Titles by Franchise",
+        xaxis_title="No. of Titles",
+        yaxis_title="Team",
+        template="plotly_white",
+        showlegend=False,
+        coloraxis_showscale=False,
+        plot_bgcolor="#f9fcff",
+        paper_bgcolor="rgba(0,0,0,0)",
+        title_font=dict(size=20, color="#10233c"),
+        margin=dict(l=10, r=20, t=62, b=20),
+        height=460,
+        xaxis=dict(showgrid=True, gridcolor="#d9e6f5", zeroline=False),
+        yaxis=dict(showgrid=False),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-fig=px.bar(df,x="team",y="no_of_trophy",color="team")
+with leader_col:
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.subheader("Leaderboard")
+    st.dataframe(
+        df[["rank", "team", "no_of_trophy"]].rename(
+            columns={"rank": "Rank", "team": "Team", "no_of_trophy": "Titles"}
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.title("IPL Titles Won by Team")
-st.plotly_chart(fig,use_container_width=True)
+st.subheader("All IPL Teams")
+team_df = pd.DataFrame({"Team": sorted(db.fetch_team())})
+st.dataframe(team_df, use_container_width=True, hide_index=True)
+
 
 
 
